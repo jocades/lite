@@ -1,0 +1,16 @@
+{
+  "name": "lite",
+  "module": "index.ts",
+  "type": "module",
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "rou3": "^0.0.1",
+    "preact": "^10.22.1",
+    "preact-render-to-string": "^6.5.5"
+  }
+}
