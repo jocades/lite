@@ -11,10 +11,9 @@ class LiteRequest extends Request {
   query: URLSearchParams
   params: Params
 
-  constructor(req: Request, params: Params = {}) {
+  constructor(req: Request, url: URL, params: Params) {
     super(req)
     this.raw = req
-    const url = new URL(req.url)
     this.path = url.pathname
     this.query = url.searchParams
     this.params = params
@@ -30,8 +29,8 @@ export class Context {
   #headers: Headers = {}
   #renderer?: Renderer
 
-  constructor(req: Request) {
-    this.req = new LiteRequest(req)
+  constructor(req: Request, url: URL, params: Params = {}) {
+    this.req = new LiteRequest(req, url, params)
   }
 
   status(code: number) {
@@ -80,7 +79,8 @@ export class Context {
   }
 
   notFound() {
-    return new Response('404 Not Found', { status: 404 })
+    this.status(404)
+    return new Response('404 Not Found', this.#opts())
   }
 
   #opts(status?: number, headers?: Headers): ResponseInit {

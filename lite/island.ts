@@ -21,7 +21,6 @@ export function island<P extends Record<string, any>>(Component: FC<P>) {
 
   return (props: P) => {
     return h(
-      // @ts-ignore
       'div',
       { 'data-island': id },
       h('script', {
