@@ -3,8 +3,9 @@ import {
   type FunctionalComponent as FC,
   type AnyComponent,
   type Attributes,
+  type VNode,
 } from 'preact'
-import { render } from 'preact-render-to-string'
+import renderToString from 'preact-render-to-string'
 import { renderToReadableStream } from 'preact-render-to-string/stream'
 import { useState } from 'preact/hooks'
 
@@ -17,6 +18,8 @@ import {
 } from 'rou3'
 import { html } from 'htm/preact/index.js'
 import { Counter } from '../app/islands/counter'
+import { merge } from './util'
+import type { BunFile } from 'bun'
 
 const router = createRouter<{ payload: string }>()
 
@@ -45,9 +48,6 @@ const Script = () => html`
   </script>
 `
 
-console.log(render(<Script />))
-// console.log(<Counter />)
-
 const App: FC<{ title?: string }> = (props) => (
   <html>
     <head>
@@ -63,23 +63,92 @@ const App: FC<{ title?: string }> = (props) => (
   </html>
 )
 
+class LiteRequest extends Request {
+  raw: Request
+  path: string
+  query: URLSearchParams
+  params: Record<string, string>
+
+  constructor(req: Request, params: Record<string, string> = {}) {
+    super(req)
+    this.raw = req
+    const url = new URL(req.url)
+    this.path = trimTrailingSlash(url.pathname)
+    this.query = url.searchParams
+    this.params = params
+  }
+}
+
+export type Headers = Record<string, string>
+
+class Context {
+  req: LiteRequest
+  #status = 200
+  headers: Headers = {}
+
+  constructor(req: Request) {
+    this.req = new LiteRequest(req)
+  }
+
+  status(code: number) {
+    this.#status = code
+  }
+
+  header(key: string, value: string) {
+    this.headers[key] = value
+  }
+
+  json(data: unknown, status?: number, headers?: Headers) {
+    return Response.json(data, this.#opts(status, headers))
+  }
+
+  text(data: string, status?: number, headers?: Headers) {
+    this.header('content-type', 'text/plain')
+    return new Response(data, this.#opts(status, headers))
+  }
+
+  html(data: string, status?: number, headers?: Headers) {
+    this.header('content-type', 'text/html')
+    return new Response(data, this.#opts(status, headers))
+  }
+
+  render<P = {}>(vnode: VNode<P>, context?: any, status?: number) {
+    return this.html(renderToString(vnode, context), status)
+  }
+
+  file(file: string | BunFile, status?: number, headers?: Headers) {
+    file = typeof file === 'string' ? Bun.file(file) : file
+    this.header('content-type', file.type)
+    return new Response(file, this.#opts(status, headers))
+  }
+
+  #opts(status?: number, headers?: Headers): ResponseInit {
+    return {
+      status: status ?? this.#status,
+      headers: merge(this.headers, headers),
+    }
+  }
+}
+
 const server = Bun.serve({
   port: 8000,
   async fetch(req) {
-    const url = new URL(req.url)
-    // console.log(url)
+    const c = new Context(req)
 
-    if (url.pathname === '/client.js') {
-      // When passing a BunFile instance to the response body it will automatically
-      // set the correct 'content-type' based on the file type.
-
-      const file = Bun.file('app/client.js')
-      return new Response(file)
+    if (c.req.path === '/client.js') {
+      return c.file('app/client.js')
     }
 
-    return new Response(render(<App title="WTF" />), {
-      headers: { 'content-type': 'text/html' },
-    })
+    /* if (c.req.path === '/client.js') {
+      const file = Bun.file('app/client.js')
+      return new Response(file)
+    } */
+
+    return c.render(<App title="Home" />)
+
+    // return new Response(renderToString(<App title="Home" />), {
+    //   headers: { 'content-type': 'text/html' },
+    // })
   },
 })
 
