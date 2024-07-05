@@ -1,9 +1,9 @@
 # Based on https://raw.githubusercontent.com/github/gitignore/main/Node.gitignore
 
+# public directory
+pub/
+
 # Logs
-
-
-
 logs
 _.log
 npm-debug.log_
