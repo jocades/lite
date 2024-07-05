@@ -11,7 +11,6 @@
   "dependencies": {
     "htm": "^3.1.1",
     "preact": "^10.22.1",
-    "preact-render-to-string": "^6.5.5",
-    "rou3": "^0.0.1"
+    "preact-render-to-string": "^6.5.5"
   }
 }

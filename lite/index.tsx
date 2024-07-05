@@ -1,79 +1,28 @@
 import {
   h,
-  type FunctionalComponent as FC,
-  type AnyComponent,
   type Attributes,
+  type FunctionalComponent as FC,
   type VNode,
 } from 'preact'
 import renderToString from 'preact-render-to-string'
-import { renderToReadableStream } from 'preact-render-to-string/stream'
-import { useState } from 'preact/hooks'
-
-import {
-  createRouter,
-  addRoute,
-  findRoute,
-  removeRoute,
-  matchAllRoutes,
-} from 'rou3'
 import { html } from 'htm/preact/index.js'
 import { Counter } from '../app/islands/counter'
 import { merge } from './util'
 import type { BunFile } from 'bun'
 
-const router = createRouter<{ payload: string }>()
-
-addRoute(router, '/path', 'GET', { payload: 'this path' })
-addRoute(router, '/path/:name', 'GET', { payload: 'named route' })
-addRoute(router, '/path/foo/**', 'GET', { payload: 'wildcard route' })
-addRoute(router, '/path/foo/**:name', 'GET', {
-  payload: 'named wildcard route',
-})
-
-// Returns { payload: 'this path' }
-findRoute(router, '/path/h', 'GET')
-
-// Returns { payload: 'named route', params: { name: 'fooval' } }
-findRoute(router, '/path/fooval', 'GET')
-
-// Returns { payload: 'wildcard route' }
-findRoute(router, '/path/foo/bar/baz', 'GET')
-
-// Returns undefined (no route matched for/)
-findRoute(router, '/', 'GET')
-
-const Script = () => html`
-  <script type="module">
-    console.log('Loaded')
-  </script>
-`
-
-const App: FC<{ title?: string }> = (props) => (
-  <html>
-    <head>
-      <title>{props.title}</title>
-    </head>
-
-    <body>
-      <h1>Hello World</h1>
-      <Counter count={10} />
-      <Script />
-      <script type="module" src="/client.js"></script>
-    </body>
-  </html>
-)
+export type Params = Record<string, string>
 
 class LiteRequest extends Request {
   raw: Request
   path: string
   query: URLSearchParams
-  params: Record<string, string>
+  params: Params
 
-  constructor(req: Request, params: Record<string, string> = {}) {
+  constructor(req: Request, params: Params = {}) {
     super(req)
     this.raw = req
     const url = new URL(req.url)
-    this.path = trimTrailingSlash(url.pathname)
+    this.path = url.pathname
     this.query = url.searchParams
     this.params = params
   }
@@ -84,7 +33,8 @@ export type Headers = Record<string, string>
 class Context {
   req: LiteRequest
   #status = 200
-  headers: Headers = {}
+  #headers: Headers = {}
+  #renderer?: VNode<Attributes>
 
   constructor(req: Request) {
     this.req = new LiteRequest(req)
@@ -95,7 +45,7 @@ class Context {
   }
 
   header(key: string, value: string) {
-    this.headers[key] = value
+    this.#headers[key] = value
   }
 
   json(data: unknown, status?: number, headers?: Headers) {
@@ -112,8 +62,16 @@ class Context {
     return new Response(data, this.#opts(status, headers))
   }
 
-  render<P = {}>(vnode: VNode<P>, context?: any, status?: number) {
-    return this.html(renderToString(vnode, context), status)
+  render<P = {}>(vnode: VNode<P>, props?: P) {
+    if (!this.#renderer) {
+      return this.html(renderToString(vnode))
+    }
+    this.#renderer.props = { ...props, children: vnode }
+    return this.html(renderToString(this.#renderer))
+  }
+
+  setRenderer(renderer: VNode<Attributes>) {
+    this.#renderer = renderer
   }
 
   file(file: string | BunFile, status?: number, headers?: Headers) {
@@ -122,29 +80,72 @@ class Context {
     return new Response(file, this.#opts(status, headers))
   }
 
+  notFound() {
+    return new Response('404 Not Found', { status: 404 })
+  }
+
   #opts(status?: number, headers?: Headers): ResponseInit {
     return {
       status: status ?? this.#status,
-      headers: merge(this.headers, headers),
+      headers: headers ? merge(this.#headers, headers) : this.#headers,
     }
   }
 }
 
+const Script = () => html`
+  <script type="module">
+    console.log('Loaded')
+  </script>
+`
+
+const App: FC<{ title?: string }> = (props) => (
+  <html>
+    <head>
+      <title>{props.title}</title>
+    </head>
+    <body>
+      <h1>Hello World</h1>
+      {props.children}
+      <script type="module" src="/client.js"></script>
+    </body>
+  </html>
+)
+
+/* const renderer = <App />
+const children = <Counter count={0} />
+const props = { title: 'Home', children }
+
+renderer.props = props
+
+console.log(renderer, '')
+// console.log(renderToString(renderer))
+await Bun.write('app/index.html', renderToString(renderer)) */
+
+// console.log(jsx, '')
+
 const server = Bun.serve({
   port: 8000,
-  async fetch(req) {
+  fetch: async (req) => {
     const c = new Context(req)
+
+    c.setRenderer(<App />)
+
+    if (c.req.path === '/') {
+      return c.render(<Counter count={0} />, { title: 'Home' })
+    }
 
     if (c.req.path === '/client.js') {
       return c.file('app/client.js')
     }
+
+    return c.notFound()
 
     /* if (c.req.path === '/client.js') {
       const file = Bun.file('app/client.js')
       return new Response(file)
     } */
 
-    return c.render(<App title="Home" />)
+    // return c.render(<Counter count={0} />)
 
     // return new Response(renderToString(<App title="Home" />), {
     //   headers: { 'content-type': 'text/html' },
