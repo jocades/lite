@@ -14,7 +14,7 @@ const App: FC<{ title?: string }> = (props) => (
   <html>
     <head>
       <title>{props.title}</title>
-      <script src="https://cdn.tailwindcss.com"></script>
+      {/* <script src="https://cdn.tailwindcss.com"></script> */}
     </head>
     <body>
       {props.children}
@@ -23,12 +23,12 @@ const App: FC<{ title?: string }> = (props) => (
   </html>
 )
 
-async function toSSG(Component: FC, dest: string) {
+async function toSSG(Component: FC) {
   const content = render(<Component />)
-  await Bun.write(dest, content)
+  await Bun.write('pub/index.html', content)
 }
 
-await toSSG(App, 'public/index.html')
+// await toSSG(App)
 
 const server = Bun.serve({
   port: 8000,
@@ -42,7 +42,7 @@ const server = Bun.serve({
     }
 
     if (c.req.path === '/client.js') {
-      return c.file('app/client.js')
+      return c.file('pub/client.js')
     }
 
     return c.notFound()

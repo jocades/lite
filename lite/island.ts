@@ -1,5 +1,7 @@
 import { h, hydrate, type FunctionalComponent as FC } from 'preact'
 
+// This module will be sent to the client.
+
 let currentId = 0
 
 export function island<P extends Record<string, any>>(Component: FC<P>) {

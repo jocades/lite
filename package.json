@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "bun --watch lite/index.tsx",
-    "bundle": "bun build app/client.tsx --outdir app"
+    "bundle": "bun build app/client.ts --outdir pub"
   },
   "devDependencies": {
     "@types/bun": "latest"

@@ -1,7 +1,7 @@
-import { type Attributes, type VNode } from 'preact'
-import { renderToString, renderToStaticMarkup } from 'preact-render-to-string'
-import { merge } from './util'
 import type { BunFile } from 'bun'
+import type { VNode } from 'preact'
+import { renderToString } from 'preact-render-to-string'
+import { merge } from './util'
 
 export type Params = Record<string, string>
 
@@ -42,8 +42,8 @@ export class Context {
     this.#headers[key] = value
   }
 
-  send(status?: number, headers?: Headers) {
-    return new Response(null, this.#opts(status, headers))
+  send(body: BodyInit, status?: number, headers?: Headers) {
+    return new Response(body, this.#opts(status, headers))
   }
 
   json(data: unknown, status?: number, headers?: Headers) {

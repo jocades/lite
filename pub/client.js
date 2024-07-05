@@ -433,7 +433,7 @@ c2.__b = function(n2) {
 };
 var k2 = typeof requestAnimationFrame == "function";
 
-// app/islands/_island.ts
+// lite/island.ts
 function island(Component) {
   const id = currentId++;
   if (typeof window !== "undefined") {
@@ -471,7 +471,7 @@ var i3 = Array.isArray;
 
 // app/islands/counter.tsx
 var Counter = island((props) => {
-  const [count, setCount] = h2(props.count ?? 0);
+  const [count, setCount] = h2(props.count);
   return u3("button", {
     onClick: () => setCount(count + 1),
     children: count
