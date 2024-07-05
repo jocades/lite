@@ -22,3 +22,7 @@ export function merge<
 >(a: T, b: U) {
   return { ...a, ...b }
 }
+
+export function trimTrailingSlash(url: string) {
+  return url.replace(/\/$/, '')
+}

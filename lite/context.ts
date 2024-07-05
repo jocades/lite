@@ -1,25 +1,23 @@
 import type { BunFile } from 'bun'
-import type { VNode } from 'preact'
+import type { ComponentChildren, VNode } from 'preact'
 import { renderToString } from 'preact-render-to-string'
 import { merge } from './util'
-
-export type Params = Record<string, string>
+import type { AnyObject } from './types'
 
 class LiteRequest extends Request {
-  raw: Request
   path: string
   query: URLSearchParams
-  params: Params
+  params!: Record<string, string>
 
-  constructor(req: Request, url: URL, params: Params) {
+  constructor(req: Request) {
     super(req)
-    this.raw = req
+    const url = new URL(req.url)
     this.path = url.pathname
     this.query = url.searchParams
-    this.params = params
   }
 }
 
+export type Props<P = AnyObject> = P & { children?: ComponentChildren }
 export type Headers = Record<string, string>
 export type Renderer = VNode
 
@@ -29,8 +27,8 @@ export class Context {
   #headers: Headers = {}
   #renderer?: Renderer
 
-  constructor(req: Request, url: URL, params: Params = {}) {
-    this.req = new LiteRequest(req, url, params)
+  constructor(req: Request) {
+    this.req = new LiteRequest(req)
   }
 
   status(code: number) {
@@ -62,9 +60,10 @@ export class Context {
     return new Response(data, this.#opts(status, headers))
   }
 
-  render(data: VNode | string, props?: Record<string, unknown>) {
+  render(data: VNode | string, props: Props = {}) {
     if (!this.#renderer) return this.html(data)
-    this.#renderer.props = { ...props, children: data }
+    props.children = data
+    this.#renderer.props = props as Required<Props>
     return this.html(this.#renderer)
   }
 
@@ -81,6 +80,10 @@ export class Context {
   notFound() {
     this.status(404)
     return new Response('404 Not Found', this.#opts())
+  }
+
+  redirect(url: string, status?: number) {
+    return Response.redirect(url, status)
   }
 
   #opts(status?: number, headers?: Headers): ResponseInit {

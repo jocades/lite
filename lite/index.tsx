@@ -1,9 +1,9 @@
 import { html } from 'htm/preact'
 import { render } from 'preact-render-to-string'
 import { type FunctionalComponent as FC } from 'preact'
-import { Counter } from '../app/islands/counter'
-import { Context } from './context'
 import { Router } from './router'
+import { Context } from './context'
+import { trimTrailingSlash } from './util'
 
 const Script = () => html`
   <script type="module" src="/pub/client.js"></script>
@@ -30,42 +30,43 @@ async function toSSG(Component: FC) {
   await Bun.write('pub/index.html', content)
 }
 
-const app = new Router()
-
-app.get('/', (c) => {
-  c.setRenderer(<App />)
-  return c.render(<Counter count={0} />, { title: 'Home' })
+const fsRouter = new Bun.FileSystemRouter({
+  style: 'nextjs',
+  dir: 'app/routes',
+  fileExtensions: ['.tsx', '.jsx'],
 })
 
-app.get('/client', (c) => {
-  return c.html(<Counter count={0} />)
-})
-
-app.get('/pub/client.js', (c) => {
-  return c.file('pub/client.js')
-})
-
-// await toSSG(App)
+namespace Mod {
+  export interface Route {
+    title?: string
+    default: (c: Context) => ReturnType<Context['render']> | Router
+    GET?: (c: Context) => ReturnType<Context['render']>
+    POST?: (c: Context) => ReturnType<Context['render']>
+    PUT?: (c: Context) => ReturnType<Context['render']>
+    DELETE?: (c: Context) => ReturnType<Context['render']>
+  }
+}
 
 const server = Bun.serve({
   port: 8000,
   fetch: async (req) => {
-    const url = new URL(req.url)
+    const c = new Context(req)
 
-    const match = app.lookup(url.pathname, req.method)
+    const match = fsRouter.match(c.req)
+    if (!match) return c.notFound()
 
-    if (!match?.data) {
-      return new Response('404 Not found', { status: 404 })
+    c.req.params = match.params
+
+    const mod = await import('file://' + match.filePath)
+
+    if (mod.default instanceof Router) {
+      return mod.default.request(c)
     }
 
-    const c = new Context(req, url, match.params)
-
-    return match.data.handler(c, () => void 0)
+    const handler = mod[req.method] ?? mod.default
+    if (!handler) return c.text('Method not allowed', 405)
+    return handler(c)
   },
 })
 
 console.log(`🔥Listening at ${trimTrailingSlash(server.url.href)}`)
-
-function trimTrailingSlash(url: string) {
-  return url.replace(/\/$/, '')
-}
