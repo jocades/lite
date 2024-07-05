@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+function cleanup {
+    echo "Killing $PID"
+    kill $PID
+}
+
+trap cleanup EXIT
+
+bun build app/client.tsx --outdir app/ --watch &
+PID=$!
+
+bun run lite/index.tsx --watch

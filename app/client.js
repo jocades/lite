@@ -438,11 +438,12 @@ function island(Component) {
   const id = currentId++;
   if (typeof window !== "undefined") {
     const $island = document.querySelector(`[data-island="${id}"]`);
-    const data = JSON.parse($island.querySelector('[type="application/json"]')?.textContent || "{}");
+    const data = $island.querySelector('[type="application/json"]')?.textContent;
+    const props = JSON.parse(data || "{}");
     console.log("Island:");
     console.log($island);
-    console.log(data);
-    return D(_(Component, data), $island);
+    console.log(props);
+    return D(_(Component, props), $island);
   }
   return (props) => {
     return _("div", { "data-island": id }, _("script", {
@@ -474,5 +475,5 @@ var Counter = island((props) => {
   return u3("button", {
     onClick: () => setCount(count + 1),
     children: count
-  });
+  }, undefined, false, undefined, this);
 });

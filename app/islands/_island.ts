@@ -7,15 +7,14 @@ export function island<P extends Record<string, any>>(Component: FC<P>) {
 
   if (typeof window !== 'undefined') {
     const $island = document.querySelector(`[data-island="${id}"]`)!
-    const data = JSON.parse(
-      $island.querySelector('[type="application/json"]')?.textContent || '{}',
-    )
+    const data = $island.querySelector('[type="application/json"]')?.textContent
+    const props = JSON.parse(data || '{}')
 
     console.log('Island:')
     console.log($island)
-    console.log(data)
+    console.log(props)
 
-    return hydrate(h(Component, data), $island) as unknown as FC<P>
+    return hydrate(h(Component, props), $island) as unknown as FC<P>
   }
 
   return (props: P) => {
