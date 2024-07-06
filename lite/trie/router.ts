@@ -1,4 +1,5 @@
 import { Context } from '../context'
+import path from 'path'
 import {
   createRouter,
   addRoute,
@@ -8,6 +9,7 @@ import {
   type RouterContext,
 } from './index'
 import type { MaybePromise } from '../types'
+import { pipe } from './pipe'
 
 export const HTTP_METHODS = [
   'GET',
@@ -22,92 +24,128 @@ export type HTTP_METHOD = (typeof HTTP_METHODS)[number]
 
 export type Next = () => MaybePromise<Response | void>
 
-export interface Handler<T extends string = ''> {
-  (c: Context, next: Next): MaybePromise<Response>
-}
+export type H<T extends string = string> = (
+  path: T,
+  ...handlers: Handler<T>[]
+) => Router
+
+export type Handler<T extends string = ''> = (
+  c: Context,
+  next: Next,
+) => MaybePromise<Response | void>
 
 export class Router {
   basePath: string
-  ctx: RouterContext<{
-    handler: (c: Context, next: Next) => MaybePromise<Response>
-  }>
+  ctx: RouterContext<{ handlers: Handler[] }>
+  middleware: Handler[]
+  subRouters: { [path: string]: Router }
+
+  get!: H
+  post!: H
+  put!: H
+  delete!: H
+  patch!: H
+  options!: H
 
   constructor(basePath = '') {
     this.basePath = basePath
     this.ctx = createRouter()
+    this.middleware = []
+    this.subRouters = {}
+
+    for (const method of HTTP_METHODS) {
+      this[method.toLowerCase() as Lowercase<HTTP_METHOD>] = (
+        path,
+        ...handlers
+      ) => {
+        this.#addRoute(path, handlers, method)
+        return this
+      }
+    }
+  }
+
+  all(path: string, ...handlers: Handler[]) {
+    for (const method of HTTP_METHODS) {
+      this.#addRoute(path, handlers, method)
+    }
+    return this
   }
 
   #addRoute<T extends string>(
     path: T,
-    handler: Handler<T>,
-    method: HTTP_METHOD | 'ALL',
+    handlers: Handler<T>[],
+    method: HTTP_METHOD,
   ) {
-    addRoute(this.ctx, this.basePath + path, method, { handler })
+    addRoute(this.ctx, this.basePath + path, method, { handlers })
   }
 
-  lookup(path: string, method: string) {
+  #lookup(path: string, method: HTTP_METHOD | (string & {})) {
     return findRoute(this.ctx, path, method)
   }
 
-  get<T extends string>(path: T, handler: Handler<T>) {
-    this.#addRoute(path, handler, 'GET')
+  use(...handlers: Handler[]) {
+    this.middleware.push(...handlers)
     return this
   }
 
-  post<T extends string>(path: T, handler: Handler<T>) {
-    this.#addRoute(path, handler, 'POST')
+  route(path: string, router: Router) {
+    this.subRouters[this.basePath + path] = router
     return this
   }
 
-  put<T extends string>(path: T, handler: Handler<T>) {
-    this.#addRoute(path, handler, 'PUT')
-    return this
-  }
-
-  delete<T extends string>(path: T, handler: Handler<T>) {
-    this.#addRoute(path, handler, 'DELETE')
-    return this
-  }
-
-  patch<T extends string>(path: T, handler: Handler<T>) {
-    this.#addRoute(path, handler, 'PATCH')
-    return this
-  }
-
-  options<T extends string>(path: T, handler: Handler<T>) {
-    this.#addRoute(path, handler, 'OPTIONS')
-    return this
-  }
-
-  all<T extends string>(path: T, handler: Handler<T>) {
-    this.#addRoute(path, handler, 'ALL')
-  }
-
-  fetch = (req: Request) => {
-    const c = new Context(req)
-    console.log(c.req.path)
-
-    const match = this.lookup(c.req.path, c.req.method)
+  #dispatch(c: Context) {
+    const match = this.#lookup(c.req.path, c.req.method)
     if (!match) return c.notFound()
 
     c.req.params = match.params ?? {}
 
-    return match.data!.handler(c, () => void 0)
+    const handlers = [...this.middleware, ...match.data!.handlers]
+    const dispatch = pipe(
+      handlers,
+      (err) => {
+        console.error(err)
+        return c.text('Internal Server Error', 500)
+      },
+      (c) => {
+        return c.notFound()
+      },
+    )
+
+    return dispatch(c)
   }
 
-  fire(c: Context) {
-    const match = this.lookup(c.req.path, c.req.method)
-    if (!match) return c.notFound()
-    return match.data!.handler(c, () => void 0)
+  fetch = async (req: Request): Promise<Response> => {
+    return this.#dispatch(new Context(req))
   }
 
-  request(where: RequestInfo | URL | Context, init?: RequestInit) {
-    if (where instanceof Context) {
-      return this.fire(where)
+  request(where: string | Request | URL, origin?: string) {
+    if (where instanceof Request) {
+      return this.#dispatch(new Context(where))
     }
-    const origin = 'https://example.com'
-    const path = where instanceof Request ? where.url : where
-    const req = new Request(new URL(path, origin), init)
-    return this.fetch(req)
+
+    if (where instanceof URL) {
+      const req = new Request(where)
+      return this.#dispatch(new Context(req, where))
+    }
+
+    origin ??= 'http://localhost:3000'
+    const url = new URL(where, origin)
+    const req = new Request(url)
+    return this.#dispatch(new Context(req, url))
   }
 }
+
+const app = new Router()
+
+app.get('/', (c) => c.html('<h1>Home</h1>'))
+
+// const req = new Request('http://localhost:3000')
+// const res = await app.fetch(req)
+// console.log(await res.text())
+//
+const r2 = new Request('http://localhost:3000/')
+const s2 = await app.fetch(r2)
+console.log(await s2.text())
+console.log(s2.headers)
+
+// console.log(app.subRouters)

@@ -3,16 +3,17 @@ import type { FC } from 'preact/compat'
 
 const Script = () => html`
   <script type="module">
-    const ws = new WebSocket('ws://localhost:8000/ws')
-    ws.onopen = () => {
-      console.log('Connected to server')
-      ws.send('Hello from client')
-    }
-    ws.onmessage = (e) => {
-      if (e.data === 'reload') {
-        location.reload()
-      }
-    }
+    console.log('Loaded')
+    // const ws = new WebSocket('ws://localhost:8000/ws')
+    // ws.onopen = () => {
+    //   console.log('Connected to server')
+    //   ws.send('Hello from client')
+    // }
+    // ws.onmessage = (e) => {
+    //   if (e.data === 'reload') {
+    //     location.reload()
+    //   }
+    // }
   </script>
 `
 

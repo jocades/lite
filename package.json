@@ -9,7 +9,10 @@
   "devDependencies": {
     "@mdx-js/esbuild": "^3.0.1",
     "@types/bun": "latest",
-    "@types/mdx": "^2.0.13"
+    "@types/mdx": "^2.0.13",
+    "chokidar": "^3.6.0",
+    "remark-frontmatter": "^5.0.0",
+    "remark-mdx-frontmatter": "^5.0.0"
   },
   "peerDependencies": {
     "typescript": "^5.0.0"

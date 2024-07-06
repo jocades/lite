@@ -1,13 +1,15 @@
 import { h, type VNode } from 'preact'
 import path from 'path'
-import { html } from 'htm/preact'
 import { render } from 'preact-render-to-string'
 import { type FunctionalComponent as FC } from 'preact'
 import { Router } from './trie/router'
 import { Context } from './context'
 import { trimTrailingSlash } from './util'
 import type { ServeWithoutFetch } from './types'
-import type { Server } from 'bun'
+import { pathToFileURL, type Server } from 'bun'
+import { watch } from 'chokidar'
+import { importGlob } from './runtime/import-glob'
+import { existsSync as exists } from 'fs'
 
 async function toSSG(Component: FC) {
   const content = render(<Component />)
@@ -17,8 +19,10 @@ async function toSSG(Component: FC) {
 const fsRouter = new Bun.FileSystemRouter({
   style: 'nextjs',
   dir: 'app/routes',
-  fileExtensions: ['.tsx', '.jsx'],
+  fileExtensions: ['.tsx', '.jsx', '.ts', '.js', '.mjs'],
 })
+
+// console.log(fsRouter.routes)
 
 namespace Mod {
   export interface Route {
@@ -44,10 +48,49 @@ const re = {
   htmljsx: /^(.+)\.(html|tsx|jsx)$/,
 }
 
+// console.log(fsRouter.routes)
+// console.log(fsRouter.match('/_404'))
+
+// const modules = importGlob('app/routes/**/*.tsx') // -> { [path]: () => Promise<Module> }
+
+// const sorted = Object.entries(modules).sort(
+//   ([a], [b]) => a.split('/').length - b.split('/').length,
+// )
+
+const layouts = importGlob('app/routes/**/_layout.tsx', { import: 'default' })
+
+/* console.log('LAYOUTS', layouts)
+
+const _layout = await layouts['app/routes/_layout.tsx']()
+
+const req = new Request('http://localhost:3000/')
+const c = new Context(req)
+c.setRenderer(_layout)
+const jsx = <h1>Hello, World!</h1>
+const res = c.render(jsx, { title: 'Hello' })
+
+console.log(await res.text())
+*/
+//
+// const _notFound = importGlob('_404.tsx', {
+//   import: 'default',
+//   // cwd: 'app/routes',
+// })
+
+// console.log(_notFound)
+
 export function devServer(
   opts: ServeWithoutFetch,
   cb?: (server: Server) => void,
 ) {
+  watch('app/routes/**/*.tsx').on('all', async (event, path, stats) => {
+    // console.log(event, path)
+
+    if (['add', 'unlink'].includes(event)) {
+      fsRouter.reload()
+    }
+  })
+
   const server = Bun.serve({
     ...opts,
     fetch: async (req) => {
@@ -62,28 +105,31 @@ export function devServer(
         return c.file('pub/client.js')
       }
 
+      const _import = layouts['app/routes/_layout.tsx']
+
+      if (_import) {
+        const _rootLayout = await _import()
+        c.setRenderer(_rootLayout)
+      }
+
       const match = fsRouter.match(c.req)
-      if (!match) return c.notFound()
+
+      if (!match) {
+        return import('../app/routes/_404.tsx')
+          .then((m) => m.default(c))
+          .catch((err) => {
+            console.error(err)
+            return c.notFound()
+          })
+      }
 
       c.req.params = match.params
 
-      const _route = await import('file://' + match.filePath)
+      const { href } = pathToFileURL(match.filePath)
+      const _route = await import(href)
 
       if (_route.default instanceof Router) {
         return _route.default.request(c)
-      }
-
-      const filepath = path.join(path.dirname(match.filePath), LAYOUT)
-
-      console.log(match)
-
-      let _layout
-      try {
-        _layout = await import('file://' + filepath)
-        console.log('found layout')
-        c.setRenderer(_layout.default)
-      } catch (err) {
-        console.error(err)
       }
 
       const handler = _route[req.method] ?? _route.default
@@ -91,19 +137,22 @@ export function devServer(
 
       const title = _route.title ?? match.src.replace(re.jsx, '$1')
 
-      let res = handler(c)
-      // res = res instanceof Promise ? await res : res
-      if (res instanceof Promise) {
-        console.log('awaiting')
-        res = await res
+      try {
+        const res = await handler(c)
+        return res instanceof Response ? res : c.render(res, { title })
+      } catch (err: any) {
+        return await import('../app/routes/_error.tsx')
+          .then((m) => m.default(err, c))
+          .catch((err) => {
+            console.error(err)
+            return c.text('Internal Server Error', 500)
+          })
       }
-
-      return res instanceof Response ? res : c.render(res, { title })
     },
 
     websocket: {
       open(ws) {
-        console.log('WS OPEN', ws)
+        console.log('WS OPEN', ws.data)
       },
       message(ws, data) {
         console.log('WS MESSAGE', data)

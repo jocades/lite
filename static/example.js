@@ -308,20 +308,16 @@ var f2 = 0;
 var i2 = Array.isArray;
 
 // lite/build/example.mdx
-function Thing() {
-  return u2(k, {
-    children: "World"
-  });
-}
 var _createMdxContent = function(props) {
   const _components = {
     h1: "h1",
     ...props.components
   };
   return u2(_components.h1, {
-    children: ["Hello ", u2(Thing, {})]
+    children: ["Hello ", props.name.toUpperCase()]
   });
 };
+var frontmatter = undefined;
 function MDXContent(props = {}) {
   const { wrapper: MDXLayout } = props.components || {};
   return MDXLayout ? u2(MDXLayout, {
@@ -332,6 +328,6 @@ function MDXContent(props = {}) {
   }) : _createMdxContent(props);
 }
 export {
-  MDXContent as default,
-  Thing
+  frontmatter,
+  MDXContent as default
 };

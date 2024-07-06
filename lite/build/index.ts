@@ -1,13 +1,24 @@
-import mdx from '@mdx-js/esbuild'
+import { mdx } from 'lite/runtime/mdx-plugin'
 
-const result = await Bun.build({
-  entrypoints: ['./lite/build/example.mdx'],
-  outdir: './lite/build',
-  plugins: [mdx({ jsxImportSource: 'preact' })],
-})
+export async function buildClient() {
+  const result = await Bun.build({
+    entrypoints: ['./lite/build/example.mdx'],
+    outdir: './static',
+    plugins: [mdx()],
+  })
 
-if (!result.success) {
-  throw new AggregateError(result.logs, 'Build failed')
+  if (!result.success) {
+    throw new AggregateError(result.logs, 'Build failed')
+  }
+
+  for (const output of result.outputs) {
+    console.log(output.path, '-', (output.size / 1024).toFixed(2), 'KB')
+  }
 }
 
-// plugin(mdx({ jsxImportSource: 'preact' }))
+const transpiler = new Bun.Transpiler({ loader: 'tsx' })
+
+// const imports = transpiler.scan(
+//   await Bun.file('app/client.ts').arrayBuffer(),
+// )
+// console.log(imports)

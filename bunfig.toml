@@ -1,1 +1,1 @@
-preload = ["./lite/build/lite-plugin.ts","./lite/build/mdx-plugin.js" ]
+preload = ["./lite/runtime/preload.ts"]
