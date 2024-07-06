@@ -1,10 +1,11 @@
 import { h, hydrate, type FunctionalComponent as FC } from 'preact'
+import type { AnyObject } from './types'
 
 // This module will be sent to the client.
 
 let currentId = 0
 
-export function island<P extends Record<string, any>>(Component: FC<P>) {
+export function island<P extends AnyObject>(Component: FC<P>) {
   const id = currentId++
 
   if (typeof window !== 'undefined') {
@@ -27,7 +28,7 @@ export function island<P extends Record<string, any>>(Component: FC<P>) {
         type: 'application/json',
         dangerouslySetInnerHTML: { __html: JSON.stringify(props) },
       }),
-      h(Component, props),
+      h(Component, props)
     )
   }
 }

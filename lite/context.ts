@@ -1,5 +1,6 @@
 import type { BunFile } from 'bun'
 import type { ComponentChildren, VNode } from 'preact'
+import { h, type FunctionalComponent as FC } from 'preact'
 import { renderToString } from 'preact-render-to-string'
 import { merge } from './util'
 import type { AnyObject } from './types'
@@ -17,15 +18,13 @@ class LiteRequest extends Request {
   }
 }
 
-export type Props<P = AnyObject> = P & { children?: ComponentChildren }
 export type Headers = Record<string, string>
-export type Renderer = VNode
 
 export class Context {
   req: LiteRequest
   #status = 200
   #headers: Headers = {}
-  #renderer?: Renderer
+  #renderer?: FC
 
   constructor(req: Request) {
     this.req = new LiteRequest(req)
@@ -60,14 +59,13 @@ export class Context {
     return new Response(data, this.#opts(status, headers))
   }
 
-  render(data: VNode | string, props: Props = {}) {
+  render(data: VNode | string, props: AnyObject | null = null) {
     if (!this.#renderer) return this.html(data)
-    props.children = data
-    this.#renderer.props = props as Required<Props>
-    return this.html(this.#renderer)
+    return this.html(h(this.#renderer, props, data))
   }
 
-  setRenderer(renderer: Renderer) {
+  setRenderer(renderer: FC) {
+    console.log('RENDERER', renderer)
     this.#renderer = renderer
   }
 

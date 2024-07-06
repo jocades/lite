@@ -1,12 +1,17 @@
 import type { Context } from 'lite/context'
 import { Router } from 'lite/router'
+import { Counter } from '../islands/counter'
 
-// export default (c: Context) => {
-//   console.log('GET /')
-//   return c.render(<div>Hello, World!</div>)
-// }
+const Component = () => <div>Hello World</div>
 
-const app = new Router()
+export const title = 'Hello'
+
+export default (c: Context) => {
+  console.log('GET /')
+  return <Counter count={0} />
+}
+
+/* const app = new Router()
 
 app.get('/', (c) => {
   console.log('GET /')
@@ -18,4 +23,4 @@ app.post('/', (c) => {
   return c.text('Hello, World!')
 })
 
-export default app
+export default app */
