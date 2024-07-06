@@ -1,5 +1,4 @@
-import { join } from 'path'
-import { Context } from './context'
+import { Context } from '../context'
 import {
   createRouter,
   addRoute,
@@ -7,8 +6,8 @@ import {
   removeRoute,
   matchAllRoutes,
   type RouterContext,
-} from './trie'
-import type { MaybePromise } from './types'
+} from './index'
+import type { MaybePromise } from '../types'
 
 export const HTTP_METHODS = [
   'GET',
@@ -32,7 +31,6 @@ export class Router {
   ctx: RouterContext<{
     handler: (c: Context, next: Next) => MaybePromise<Response>
   }>
-  fallback: [HTTP_METHOD, Handler<string>][] = []
 
   constructor(basePath = '') {
     this.basePath = basePath
@@ -42,9 +40,9 @@ export class Router {
   #addRoute<T extends string>(
     path: T,
     handler: Handler<T>,
-    method: HTTP_METHOD | 'ALL'
+    method: HTTP_METHOD | 'ALL',
   ) {
-    addRoute(this.ctx, path, method, { handler })
+    addRoute(this.ctx, this.basePath + path, method, { handler })
   }
 
   lookup(path: string, method: string) {
@@ -52,10 +50,6 @@ export class Router {
   }
 
   get<T extends string>(path: T, handler: Handler<T>) {
-    if (path === '*') {
-      this.fallback.push(['GET', handler])
-      return this
-    }
     this.#addRoute(path, handler, 'GET')
     return this
   }
@@ -94,15 +88,7 @@ export class Router {
     console.log(c.req.path)
 
     const match = this.lookup(c.req.path, c.req.method)
-
-    if (!match) {
-      for (const [method, handler] of this.fallback) {
-        if (method === c.req.method) {
-          return handler(c, () => void 0)
-        }
-      }
-      return c.notFound()
-    }
+    if (!match) return c.notFound()
 
     c.req.params = match.params ?? {}
 

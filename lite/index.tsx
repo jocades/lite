@@ -3,7 +3,7 @@ import path from 'path'
 import { html } from 'htm/preact'
 import { render } from 'preact-render-to-string'
 import { type FunctionalComponent as FC } from 'preact'
-import { Router } from './router'
+import { Router } from './trie/router'
 import { Context } from './context'
 import { trimTrailingSlash } from './util'
 import type { ServeWithoutFetch } from './types'
@@ -75,7 +75,6 @@ export function devServer(
 
       const filepath = path.join(path.dirname(match.filePath), LAYOUT)
 
-      // const title =
       console.log(match)
 
       let _layout
@@ -113,10 +112,8 @@ export function devServer(
     },
   })
 
-  cb?.(server) ??
-    console.log(`🔥Listening at ${trimTrailingSlash(server.url.href)}`)
+  if (!cb) console.log(`🔥Listening at ${trimTrailingSlash(server.url.href)}`)
+  else cb(server)
 
   return server
 }
-
-devServer({ port: 8000 })

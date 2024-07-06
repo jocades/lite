@@ -3,11 +3,13 @@
   "module": "index.ts",
   "type": "module",
   "scripts": {
-    "dev": "bun --watch lite/index.tsx",
+    "dev": "bun --watch app/server.ts",
     "bundle": "bun build app/client.ts --outdir pub"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@mdx-js/esbuild": "^3.0.1",
+    "@types/bun": "latest",
+    "@types/mdx": "^2.0.13"
   },
   "peerDependencies": {
     "typescript": "^5.0.0"

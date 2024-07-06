@@ -1,5 +1,4 @@
 import { html } from 'htm/preact'
-import type { AnyObject } from 'lite/types'
 import type { FC } from 'preact/compat'
 
 const Script = () => html`

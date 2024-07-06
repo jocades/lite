@@ -1,4 +1,4 @@
-import { h, hydrate, type FunctionalComponent as FC } from 'preact'
+import { h, hydrate, type FunctionComponent as FC } from 'preact'
 import type { AnyObject } from './types'
 
 // This module will be sent to the client.
@@ -28,7 +28,7 @@ export function island<P extends AnyObject>(Component: FC<P>) {
         type: 'application/json',
         dangerouslySetInnerHTML: { __html: JSON.stringify(props) },
       }),
-      h(Component, props)
+      h(Component, props),
     )
   }
 }

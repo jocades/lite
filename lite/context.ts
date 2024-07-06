@@ -59,9 +59,9 @@ export class Context {
     return new Response(data, this.#opts(status, headers))
   }
 
-  render(data: VNode | string, props: AnyObject | null = null) {
-    if (!this.#renderer) return this.html(data)
-    return this.html(h(this.#renderer, props, data))
+  render(children: VNode | string, props: AnyObject | null = null) {
+    if (!this.#renderer) return this.html(children)
+    return this.html(h(this.#renderer, props, children))
   }
 
   setRenderer(renderer: FC) {
