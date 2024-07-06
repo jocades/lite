@@ -46,12 +46,17 @@ const re = {
 
 export function devServer(
   opts: ServeWithoutFetch,
-  cb?: (server: Server) => void
+  cb?: (server: Server) => void,
 ) {
   const server = Bun.serve({
     ...opts,
     fetch: async (req) => {
       const c = new Context(req)
+
+      if (c.req.path === '/ws') {
+        if (server.upgrade(req, { data: { id: 1 } })) return
+        return new Response('Upgrade failed', { status: 500 })
+      }
 
       if (c.req.path === '/pub/client.js') {
         return c.file('pub/client.js')
@@ -88,7 +93,11 @@ export function devServer(
       const title = _route.title ?? match.src.replace(re.jsx, '$1')
 
       let res = handler(c)
-      res = res instanceof Promise ? await res : res
+      // res = res instanceof Promise ? await res : res
+      if (res instanceof Promise) {
+        console.log('awaiting')
+        res = await res
+      }
 
       return res instanceof Response ? res : c.render(res, { title })
     },

@@ -23,7 +23,7 @@ export type HTTP_METHOD = (typeof HTTP_METHODS)[number]
 
 export type Next = () => MaybePromise<Response | void>
 
-export interface Handler<T extends string> {
+export interface Handler<T extends string = ''> {
   (c: Context, next: Next): MaybePromise<Response>
 }
 
@@ -42,7 +42,7 @@ export class Router {
   #addRoute<T extends string>(
     path: T,
     handler: Handler<T>,
-    method: HTTP_METHOD | 'ALL',
+    method: HTTP_METHOD | 'ALL'
   ) {
     addRoute(this.ctx, path, method, { handler })
   }

@@ -7,7 +7,7 @@ function cleanup {
 
 trap cleanup EXIT
 
-bun build app/client.tsx --outdir app/ --watch &
+bun build --outdir pub --watch app/client.ts &
 PID=$!
 
-bun run lite/index.tsx --watch
+bun --watch lite/index.tsx
