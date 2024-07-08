@@ -4,15 +4,10 @@ import type { FC } from 'preact/compat'
 const Script = () => html`
   <script type="module">
     const ws = new WebSocket('ws://localhost:8000/ws')
-    ws.onopen = () => {
-      console.log('Connected to server')
-      ws.send('Hello from client')
-    }
+
     ws.onmessage = (e) => {
       const msg = JSON.parse(e.data)
-      console.log('Message from server', msg)
       if (msg?.type === 'reload') {
-        console.log('Dinamycally import maybe', msg?.path)
         location.reload()
       }
     }
@@ -28,7 +23,7 @@ export default layout(({ children, title }) => {
     <html>
       <head>
         <title>{title}</title>
-        {/* <script src="https://cdn.tailwindcss.com"></script> */}
+        <script src="https://cdn.tailwindcss.com"></script>
       </head>
       <body>
         {children}

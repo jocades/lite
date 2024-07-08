@@ -86,9 +86,9 @@ export class Router {
     return findRoute(this.ctx, path, method)
   }
 
-  dispatch = (c: Context) => {
-    console.log(c.req.path)
-    console.log(c.req.path, c.req.method)
+  dispatch(c: Context) {
+    // console.log(c.req.path)
+    // console.log(c.req.path, c.req.method)
 
     const match = this.#lookup(c.req.path, c.req.method)
     if (!match) return c.notFound()
@@ -110,7 +110,7 @@ export class Router {
     return dispatch(c)
   }
 
-  fetch = (req: Request): MaybePromise<Response> => {
+  fetch = (req: Request) => {
     return this.dispatch(new Context(req))
   }
 
@@ -138,20 +138,3 @@ export class Router {
     return this.dispatch(new Context(req, url))
   }
 }
-
-const app = new Router()
-
-app.get(
-  '/first',
-  async (c, next) => {
-    console.log('mw1')
-    c.setRenderer((props) => <main>{props.children}</main>)
-    await next()
-    console.log('mw1 after', c.req.headers.get('x-foo'))
-  },
-  (c) => {
-    c.req.headers.set('x-foo', 'bar')
-    // throw new Error('oops')
-    return c.render('Hello, World!')
-  },
-)

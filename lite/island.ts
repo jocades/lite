@@ -5,6 +5,7 @@ import type { AnyObject } from './types'
 
 let componentId = 0
 
+// for dev
 const islands = new Map<number, FC<any>>()
 
 export function island<P extends AnyObject>(Component: FC<P>) {
@@ -12,35 +13,26 @@ export function island<P extends AnyObject>(Component: FC<P>) {
   islands.set(id, Component)
 
   if (typeof window !== 'undefined') {
-    console.log('hydrating component', id)
-
     document
-      .querySelectorAll(`[data-island="${id}"]:not([data-hydrated])`)
+      .querySelectorAll(`[__island="${id}"]:not([hydrated])`)
       .forEach(($island) => {
-        console.log('query')
-        $island.setAttribute('data-hydrated', '')
+        $island.setAttribute('hydrated', '')
+        $island.removeAttribute('__island')
 
-        const data = $island.querySelector(
-          '[type="application/json"]',
-        )?.textContent
-
-        const props = JSON.parse(data || '{}')
-        console.log('props', props)
+        const $script = $island.querySelector('[type="application/json"]')
+        const props = JSON.parse($script?.textContent || '{}')
+        $script?.remove()
 
         hydrate(h(Component, props), $island)
-
-        console.log('Hydrating island:', id)
-
-        return null as unknown as FC<P>
       })
+
+    return null as unknown as FC<P>
   }
 
   return (props: P) => {
-    console.log('executing component')
-
     return h(
       'div',
-      { 'data-island': id },
+      { __island: id },
       h('script', {
         type: 'application/json',
         dangerouslySetInnerHTML: { __html: JSON.stringify(props) },

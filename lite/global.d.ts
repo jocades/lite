@@ -1,7 +1,7 @@
 declare global {
   namespace preact.JSX {
     interface HTMLAttributes {
-      'data-island'?: number | string
+      __island?: number | string
     }
   }
 }

@@ -11,7 +11,9 @@ export const Counter = island<CounterProps>((props) => {
   return (
     <section>
       <h1>I am an Island</h1>
-      <button onClick={() => setCount(count + 1)}>{count}</button>
+      <button class="btn" onClick={() => setCount(count + 1)}>
+        {count}
+      </button>
     </section>
   )
 })

@@ -1,17 +1,13 @@
-import { h, type VNode } from 'preact'
-import path from 'path'
+import { type VNode } from 'preact'
 import { render } from 'preact-render-to-string'
 import { type FunctionalComponent as FC } from 'preact'
-import { Router, type HTTP_METHOD } from './trie/router'
-import { Context } from './context'
-import { isObj, isVNode, trimTrailingSlash } from './util'
-import type { ServeWithoutFetch } from './types'
-import { Glob, pathToFileURL, type Server, type ServerWebSocket } from 'bun'
+import { Router, type HTTP_METHOD } from '../trie/router'
+import { Context } from '../context'
+import { importGlob, isVNode, re, trimTrailingSlash } from '../util'
+import type { ServeWithoutFetch } from '../types'
+import { Glob, type Server, type ServerWebSocket } from 'bun'
 import { watch } from 'chokidar'
-import { importGlob } from './runtime/import-glob'
-import { existsSync as exists } from 'fs'
-import { buildClient } from './build/index.ts'
-import { logger } from './middleware.ts'
+import { buildClient } from '../build/index.ts'
 
 async function toSSG(Component: FC) {
   const content = render(<Component />)
@@ -24,29 +20,10 @@ const fsRouter = new Bun.FileSystemRouter({
   fileExtensions: ['.tsx', '.jsx', '.ts', '.js', '.mjs'],
 })
 
-// console.log(fsRouter.routes)
-
 type RouteModule = {
   title?: string
   default: Router | ((c: Context) => Response | VNode)
 } & Record<HTTP_METHOD, (c: Context) => Response>
-
-const re = {
-  js: /^(.+)\.(ts|js|mjs)$/,
-  jsx: /^(.+)\.(tsx|jsx)$/,
-  html: /^(.+)\.html$/,
-  index: /\/?index$/,
-  htmljsx: /^(.+)\.(html|tsx|jsx)$/,
-}
-
-// console.log(fsRouter.routes)
-// console.log(fsRouter.match('/_404'))
-
-// const modules = importGlob('app/routes/**/*.tsx') // -> { [path]: () => Promise<Module> }
-
-// const sorted = Object.entries(modules).sort(
-//   ([a], [b]) => a.split('/').length - b.split('/').length,
-// )
 
 function getLayouts() {
   return importGlob('app/routes/**/_layout.tsx', {
@@ -58,9 +35,7 @@ let layouts = getLayouts()
 
 const transpiler = new Bun.Transpiler({ loader: 'tsx' })
 
-const islands = new Glob('app/islands/**/*.tsx').scanSync()
-
-console.log(Array.from(islands))
+// const islands = new Glob('app/islands/**/*.tsx').scanSync()
 
 export function devServer(
   opts: ServeWithoutFetch,
@@ -68,11 +43,25 @@ export function devServer(
 ) {
   let ws: ServerWebSocket<unknown>
 
+  Object.entries(
+    importGlob<{ frontmatter: { title: string } }>('app/islands/*.mdx'),
+  ).forEach(([path, mod]) => {
+    mod().then((m) => {
+      console.log(path, m.frontmatter.title)
+    })
+  })
+
   watch('app/routes/**/*.tsx').on('all', async (event, path, stats) => {
     if (event === 'change') {
-      console.log(path, 'changed')
+      // console.log(path, 'changed')
       ws?.send(JSON.stringify({ type: 'reload', path }))
     }
+  })
+
+  watch('app/client.ts').on('change', async () => {
+    console.log('Rebuilding client')
+    await buildClient()
+    ws?.send(JSON.stringify({ type: 'reload', path: '/pub/client.js' }))
   })
 
   watch('app/islands/**/*.tsx').on('all', async (event, path) => {
@@ -99,6 +88,8 @@ export function devServer(
     fetch: async (req) => {
       const c = new Context(req)
 
+      console.log(c.req.method, c.req.path)
+
       if (c.req.path === '/ws') {
         if (server.upgrade(req, { data: { id: wsID++ } })) return
         return c.text('Upgrade failed', 500)
@@ -115,10 +106,10 @@ export function devServer(
         c.setRenderer(_rootLayout)
       }
 
-      const match = fsRouter.match(c.req)
+      const match = fsRouter.match(req)
 
       if (!match) {
-        return import('../app/routes/_404.tsx')
+        return import('../../app/routes/_404.tsx')
           .then((m) => m.default(c))
           .catch((err) => {
             console.error(err)
@@ -127,7 +118,6 @@ export function devServer(
       }
 
       c.req.params = match.params
-      console.log(match)
 
       const _route = await import(match.filePath)
 
@@ -147,7 +137,7 @@ export function devServer(
         if (isVNode(res)) return c.render(res, { title })
         throw new Error(`Invalid response at ${match.filePath}`)
       } catch (err: any) {
-        return await import('../app/routes/_error.tsx')
+        return await import('../../app/routes/_error.tsx')
           .then((m) => m.default(err, c))
           .catch((err) => {
             console.error(err)
@@ -158,14 +148,9 @@ export function devServer(
 
     websocket: {
       open(websocket) {
-        console.log('WS OPEN', websocket.data)
-        console.log(websocket.remoteAddress)
         ws = websocket
-        websocket.send(JSON.stringify({ type: 'connected' }))
       },
-      message(ws, data) {
-        console.log('WS MESSAGE', data)
-      },
+      message() {},
     },
   })
 

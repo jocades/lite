@@ -1,3 +1,4 @@
+import { Glob } from 'bun'
 import type { VNode } from 'preact'
 import type { AnyObject } from './types'
 
@@ -30,4 +31,30 @@ export function merge<
 
 export function trimTrailingSlash(url: string) {
   return url.replace(/\/$/, '')
+}
+
+export const re = {
+  js: /^(.+)\.(ts|js|mjs)$/,
+  jsx: /^(.+)\.(tsx|jsx)$/,
+}
+
+export function importGlob<
+  M extends AnyObject,
+  K extends keyof M | undefined = undefined,
+>(pattern: string, opts?: { cwd?: string; import?: K }) {
+  const glob = new Glob(pattern)
+  const result: Record<string, () => Promise<M>> = {}
+
+  for (const path of glob.scanSync(opts?.cwd)) {
+    const { href } = Bun.pathToFileURL(path)
+    if (opts?.import) {
+      result[path] = () => import(href).then((m) => m[opts.import!])
+    } else {
+      result[path] = () => import(href)
+    }
+  }
+
+  return result as K extends string
+    ? Record<string, () => Promise<M[K]>>
+    : Record<string, () => Promise<M>>
 }

@@ -1,3 +1,3 @@
-import { devServer } from 'lite/index'
+import { devServer } from 'lite/server/dev'
 
 devServer({ port: 8000 })
