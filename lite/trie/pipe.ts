@@ -10,7 +10,7 @@ export function pipe(
   return async (c: Context) => {
     let index = -1
 
-    let res: Response | void
+    let res: Response
     let isError = false
 
     async function dispatch(i: number) {
@@ -23,6 +23,7 @@ export function pipe(
         if (onNotFound) {
           return await onNotFound(c)
         }
+        throw new Error(`Handler not found at index ${i}`)
       }
 
       try {

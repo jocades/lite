@@ -3,21 +3,23 @@ import type { FC } from 'preact/compat'
 
 const Script = () => html`
   <script type="module">
-    console.log('Loaded')
-    // const ws = new WebSocket('ws://localhost:8000/ws')
-    // ws.onopen = () => {
-    //   console.log('Connected to server')
-    //   ws.send('Hello from client')
-    // }
-    // ws.onmessage = (e) => {
-    //   if (e.data === 'reload') {
-    //     location.reload()
-    //   }
-    // }
+    const ws = new WebSocket('ws://localhost:8000/ws')
+    ws.onopen = () => {
+      console.log('Connected to server')
+      ws.send('Hello from client')
+    }
+    ws.onmessage = (e) => {
+      const msg = JSON.parse(e.data)
+      console.log('Message from server', msg)
+      if (msg?.type === 'reload') {
+        console.log('Dinamycally import maybe', msg?.path)
+        location.reload()
+      }
+    }
   </script>
 `
 
-function layout(Component: FC<{ title: string }>) {
+function layout(Component: FC<RenderProps>) {
   return Component
 }
 
@@ -30,7 +32,7 @@ export default layout(({ children, title }) => {
       </head>
       <body>
         {children}
-        <script type="module" src="/pub/client.js"></script>
+        <script src="/pub/client.js"></script>
         <Script />
       </body>
     </html>

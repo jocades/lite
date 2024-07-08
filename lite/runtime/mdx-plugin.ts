@@ -4,7 +4,7 @@ import remarkFrontmatter from 'remark-frontmatter'
 import remarkMdxFrontmatter from 'remark-mdx-frontmatter'
 
 export function mdx() {
-  console.log('loading mdx plugin')
+  // console.log('loading mdx plugin')
 
   return mdxPlugin({
     jsxImportSource: 'preact',

@@ -2,8 +2,8 @@ import { mdx } from 'lite/runtime/mdx-plugin'
 
 export async function buildClient() {
   const result = await Bun.build({
-    entrypoints: ['./lite/build/example.mdx'],
-    outdir: './static',
+    entrypoints: ['./app/client.ts'],
+    outdir: './pub',
     plugins: [mdx()],
   })
 
@@ -16,9 +16,6 @@ export async function buildClient() {
   }
 }
 
-const transpiler = new Bun.Transpiler({ loader: 'tsx' })
-
-// const imports = transpiler.scan(
-//   await Bun.file('app/client.ts').arrayBuffer(),
-// )
-// console.log(imports)
+if (import.meta.main) {
+  await buildClient()
+}

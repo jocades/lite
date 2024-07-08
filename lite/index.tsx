@@ -2,14 +2,16 @@ import { h, type VNode } from 'preact'
 import path from 'path'
 import { render } from 'preact-render-to-string'
 import { type FunctionalComponent as FC } from 'preact'
-import { Router } from './trie/router'
+import { Router, type HTTP_METHOD } from './trie/router'
 import { Context } from './context'
-import { trimTrailingSlash } from './util'
+import { isObj, isVNode, trimTrailingSlash } from './util'
 import type { ServeWithoutFetch } from './types'
-import { pathToFileURL, type Server } from 'bun'
+import { Glob, pathToFileURL, type Server, type ServerWebSocket } from 'bun'
 import { watch } from 'chokidar'
 import { importGlob } from './runtime/import-glob'
 import { existsSync as exists } from 'fs'
+import { buildClient } from './build/index.ts'
+import { logger } from './middleware.ts'
 
 async function toSSG(Component: FC) {
   const content = render(<Component />)
@@ -24,21 +26,10 @@ const fsRouter = new Bun.FileSystemRouter({
 
 // console.log(fsRouter.routes)
 
-namespace Mod {
-  export interface Route {
-    title?: string
-    default: (c: Context) => ReturnType<Context['render']> | Router
-    GET?: (c: Context) => ReturnType<Context['render']>
-    POST?: (c: Context) => ReturnType<Context['render']>
-    PUT?: (c: Context) => ReturnType<Context['render']>
-    DELETE?: (c: Context) => ReturnType<Context['render']>
-  }
-}
-
-const LAYOUT = '_layout.tsx'
-const NOT_FOUND = '_404.tsx'
-const MIDDLEWARE = '_middleware.tsx'
-const MW = '_mw.tsx' // alias
+type RouteModule = {
+  title?: string
+  default: Router | ((c: Context) => Response | VNode)
+} & Record<HTTP_METHOD, (c: Context) => Response>
 
 const re = {
   js: /^(.+)\.(ts|js|mjs)$/,
@@ -57,39 +48,51 @@ const re = {
 //   ([a], [b]) => a.split('/').length - b.split('/').length,
 // )
 
-const layouts = importGlob('app/routes/**/_layout.tsx', { import: 'default' })
+function getLayouts() {
+  return importGlob('app/routes/**/_layout.tsx', {
+    import: 'default',
+  })
+}
 
-/* console.log('LAYOUTS', layouts)
+let layouts = getLayouts()
 
-const _layout = await layouts['app/routes/_layout.tsx']()
+const transpiler = new Bun.Transpiler({ loader: 'tsx' })
 
-const req = new Request('http://localhost:3000/')
-const c = new Context(req)
-c.setRenderer(_layout)
-const jsx = <h1>Hello, World!</h1>
-const res = c.render(jsx, { title: 'Hello' })
+const islands = new Glob('app/islands/**/*.tsx').scanSync()
 
-console.log(await res.text())
-*/
-//
-// const _notFound = importGlob('_404.tsx', {
-//   import: 'default',
-//   // cwd: 'app/routes',
-// })
-
-// console.log(_notFound)
+console.log(Array.from(islands))
 
 export function devServer(
   opts: ServeWithoutFetch,
   cb?: (server: Server) => void,
 ) {
-  watch('app/routes/**/*.tsx').on('all', async (event, path, stats) => {
-    // console.log(event, path)
+  let ws: ServerWebSocket<unknown>
 
-    if (['add', 'unlink'].includes(event)) {
-      fsRouter.reload()
+  watch('app/routes/**/*.tsx').on('all', async (event, path, stats) => {
+    if (event === 'change') {
+      console.log(path, 'changed')
+      ws?.send(JSON.stringify({ type: 'reload', path }))
     }
   })
+
+  watch('app/islands/**/*.tsx').on('all', async (event, path) => {
+    if (event === 'change') {
+      const client = await Bun.file('app/client.ts').text()
+      const { imports, exports } = transpiler.scan(client)
+      const importPath = path.replace('app', '.')
+
+      if (!imports.some((imp) => imp.path === importPath)) {
+        // console.log('Adding import', importPath)
+        // await Bun.write('app/client.ts', client + `import '${importPath}'`)
+      }
+
+      console.log('Rebuilding client')
+      await buildClient()
+      ws?.send(JSON.stringify({ type: 'reload', path: '/pub/client.js' }))
+    }
+  })
+
+  let wsID = 1
 
   const server = Bun.serve({
     ...opts,
@@ -97,8 +100,8 @@ export function devServer(
       const c = new Context(req)
 
       if (c.req.path === '/ws') {
-        if (server.upgrade(req, { data: { id: 1 } })) return
-        return new Response('Upgrade failed', { status: 500 })
+        if (server.upgrade(req, { data: { id: wsID++ } })) return
+        return c.text('Upgrade failed', 500)
       }
 
       if (c.req.path === '/pub/client.js') {
@@ -124,12 +127,13 @@ export function devServer(
       }
 
       c.req.params = match.params
+      console.log(match)
 
-      const { href } = pathToFileURL(match.filePath)
-      const _route = await import(href)
+      const _route = await import(match.filePath)
 
       if (_route.default instanceof Router) {
-        return _route.default.request(c)
+        const newReq = new Request(req.url.replace(match.name, ''), req)
+        return _route.default.fetch(newReq)
       }
 
       const handler = _route[req.method] ?? _route.default
@@ -139,7 +143,9 @@ export function devServer(
 
       try {
         const res = await handler(c)
-        return res instanceof Response ? res : c.render(res, { title })
+        if (res instanceof Response) return res
+        if (isVNode(res)) return c.render(res, { title })
+        throw new Error(`Invalid response at ${match.filePath}`)
       } catch (err: any) {
         return await import('../app/routes/_error.tsx')
           .then((m) => m.default(err, c))
@@ -151,12 +157,14 @@ export function devServer(
     },
 
     websocket: {
-      open(ws) {
-        console.log('WS OPEN', ws.data)
+      open(websocket) {
+        console.log('WS OPEN', websocket.data)
+        console.log(websocket.remoteAddress)
+        ws = websocket
+        websocket.send(JSON.stringify({ type: 'connected' }))
       },
       message(ws, data) {
         console.log('WS MESSAGE', data)
-        ws.send('Hello')
       },
     },
   })

@@ -1,15 +1,14 @@
 import { Context } from '../context'
-import path from 'path'
 import {
   createRouter,
   addRoute,
   findRoute,
-  removeRoute,
   matchAllRoutes,
   type RouterContext,
 } from './index'
 import type { MaybePromise } from '../types'
 import { pipe } from './pipe'
+import { isDef } from 'lite/util'
 
 export const HTTP_METHODS = [
   'GET',
@@ -35,10 +34,9 @@ export type Handler<T extends string = ''> = (
 ) => MaybePromise<Response | void>
 
 export class Router {
-  basePath: string
+  #basePath = ''
   ctx: RouterContext<{ handlers: Handler[] }>
   middleware: Handler[]
-  subRouters: { [path: string]: Router }
 
   get!: H
   post!: H
@@ -47,11 +45,9 @@ export class Router {
   patch!: H
   options!: H
 
-  constructor(basePath = '') {
-    this.basePath = basePath
+  constructor() {
     this.ctx = createRouter()
     this.middleware = []
-    this.subRouters = {}
 
     for (const method of HTTP_METHODS) {
       this[method.toLowerCase() as Lowercase<HTTP_METHOD>] = (
@@ -62,6 +58,13 @@ export class Router {
         return this
       }
     }
+  }
+
+  baseBath(path: string) {}
+
+  use(...handlers: Handler[]) {
+    this.middleware.push(...handlers)
+    return this
   }
 
   all(path: string, ...handlers: Handler[]) {
@@ -76,24 +79,17 @@ export class Router {
     handlers: Handler<T>[],
     method: HTTP_METHOD,
   ) {
-    addRoute(this.ctx, this.basePath + path, method, { handlers })
+    addRoute(this.ctx, path, method, { handlers })
   }
 
   #lookup(path: string, method: HTTP_METHOD | (string & {})) {
     return findRoute(this.ctx, path, method)
   }
 
-  use(...handlers: Handler[]) {
-    this.middleware.push(...handlers)
-    return this
-  }
+  dispatch = (c: Context) => {
+    console.log(c.req.path)
+    console.log(c.req.path, c.req.method)
 
-  route(path: string, router: Router) {
-    this.subRouters[this.basePath + path] = router
-    return this
-  }
-
-  #dispatch(c: Context) {
     const match = this.#lookup(c.req.path, c.req.method)
     if (!match) return c.notFound()
 
@@ -103,7 +99,7 @@ export class Router {
     const dispatch = pipe(
       handlers,
       (err) => {
-        console.error(err)
+        console.error('Catched', err)
         return c.text('Internal Server Error', 500)
       },
       (c) => {
@@ -114,38 +110,48 @@ export class Router {
     return dispatch(c)
   }
 
-  fetch = async (req: Request): Promise<Response> => {
-    return this.#dispatch(new Context(req))
+  fetch = (req: Request): MaybePromise<Response> => {
+    return this.dispatch(new Context(req))
   }
 
-  request(where: string | Request | URL, origin?: string) {
+  request(where: RequestInfo | URL | Context, init?: RequestInit) {
+    console.log('request', where, init)
+
+    if (where instanceof Context) {
+      return this.dispatch(where)
+    }
+
     if (where instanceof Request) {
-      return this.#dispatch(new Context(where))
+      if (isDef(init)) {
+        where = new Request(where, init)
+      }
+      return this.dispatch(new Context(where))
     }
 
     if (where instanceof URL) {
       const req = new Request(where)
-      return this.#dispatch(new Context(req, where))
+      return this.dispatch(new Context(req, where))
     }
 
-    origin ??= 'http://localhost:3000'
-    const url = new URL(where, origin)
+    const url = new URL(where, 'http://localhost')
     const req = new Request(url)
-    return this.#dispatch(new Context(req, url))
+    return this.dispatch(new Context(req, url))
   }
 }
 
 const app = new Router()
 
-app.get('/', (c) => c.html('<h1>Home</h1>'))
-
-// const req = new Request('http://localhost:3000')
-// const res = await app.fetch(req)
-// console.log(await res.text())
-//
-const r2 = new Request('http://localhost:3000/')
-const s2 = await app.fetch(r2)
-console.log(await s2.text())
-console.log(s2.headers)
-
-// console.log(app.subRouters)
+app.get(
+  '/first',
+  async (c, next) => {
+    console.log('mw1')
+    c.setRenderer((props) => <main>{props.children}</main>)
+    await next()
+    console.log('mw1 after', c.req.headers.get('x-foo'))
+  },
+  (c) => {
+    c.req.headers.set('x-foo', 'bar')
+    // throw new Error('oops')
+    return c.render('Hello, World!')
+  },
+)

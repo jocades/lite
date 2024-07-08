@@ -1,3 +1,4 @@
+import type { VNode } from 'preact'
 import type { AnyObject } from './types'
 
 export function isObj(value: unknown): value is Record<any, any> {
@@ -14,6 +15,10 @@ export function isLiteral(value: unknown): value is string | number {
 
 export function isDef<T>(value: T | undefined): value is T {
   return value !== undefined
+}
+
+export function isVNode(value: unknown): value is VNode {
+  return isObj(value) && 'type' in value && 'props' in value
 }
 
 export function merge<

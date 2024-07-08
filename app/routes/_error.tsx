@@ -8,6 +8,6 @@ export function error(h: ErrorHandler) {
 }
 
 export default error((e, c) => {
-  console.log('ERROR /_error.tsx', e)
-  return c.render(<h1>Error! {e.message}</h1>)
+  console.log('Catched', e)
+  return c.render(<h1>Oops! Something went wrong</h1>, { title: 'Error' })
 })

@@ -1,14 +1,12 @@
 import { Glob } from 'bun'
 import type { AnyObject } from 'lite/types'
 
-export type Module<D = any, E = AnyObject> = { default: D } & E
-
-export function importGlob<K = undefined>(
+export function importGlob<M extends AnyObject, K extends keyof M = keyof M>(
   pattern: string,
   opts?: { cwd?: string; import?: K },
 ) {
   const glob = new Glob(pattern)
-  const result: Record<string, () => Promise<Module>> = {}
+  const result: Record<string, () => Promise<M>> = {}
 
   for (const path of glob.scanSync(opts?.cwd)) {
     const { href } = Bun.pathToFileURL(path)
@@ -20,8 +18,8 @@ export function importGlob<K = undefined>(
   }
 
   return result as K extends string
-    ? Record<string, () => Promise<Module[K]>>
-    : Record<string, () => Promise<Module>>
+    ? Record<string, () => Promise<M[K]>>
+    : Record<string, () => Promise<M>>
 }
 
 // const routes = importGlob('app/routes/**/*.tsx')
