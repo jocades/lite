@@ -12,6 +12,7 @@
     "@types/mdx": "^2.0.13",
     "chokidar": "^3.6.0",
     "remark-frontmatter": "^5.0.0",
+    "remark-gfm": "^4.0.0",
     "remark-mdx-frontmatter": "^5.0.0"
   },
   "peerDependencies": {

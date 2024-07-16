@@ -35,51 +35,46 @@ let layouts = getLayouts()
 
 const transpiler = new Bun.Transpiler({ loader: 'tsx' })
 
-// const islands = new Glob('app/islands/**/*.tsx').scanSync()
-
 export function devServer(
   opts: ServeWithoutFetch,
   cb?: (server: Server) => void,
 ) {
   let ws: ServerWebSocket<unknown>
 
-  Object.entries(
-    importGlob<{ frontmatter: { title: string } }>('app/islands/*.mdx'),
-  ).forEach(([path, mod]) => {
-    mod().then((m) => {
-      console.log(path, m.frontmatter.title)
-    })
-  })
-
-  watch('app/routes/**/*.tsx').on('all', async (event, path, stats) => {
+  watch('app/routes/**/*.tsx').on('all', async (event, path) => {
     if (event === 'change') {
       // console.log(path, 'changed')
       ws?.send(JSON.stringify({ type: 'reload', path }))
     }
   })
 
-  watch('app/client.ts').on('change', async () => {
-    console.log('Rebuilding client')
-    await buildClient()
+  watch('app/client.ts').on('change', async (path) => {
+    // await buildClient()
     ws?.send(JSON.stringify({ type: 'reload', path: '/pub/client.js' }))
   })
 
-  watch('app/islands/**/*.tsx').on('all', async (event, path) => {
+  watch('app/islands/**/*.ts').on('all', async (event, path) => {
     if (event === 'change') {
-      const client = await Bun.file('app/client.ts').text()
-      const { imports, exports } = transpiler.scan(client)
-      const importPath = path.replace('app', '.')
-
-      if (!imports.some((imp) => imp.path === importPath)) {
-        // console.log('Adding import', importPath)
-        // await Bun.write('app/client.ts', client + `import '${importPath}'`)
-      }
-
-      console.log('Rebuilding client')
-      await buildClient()
+      // await buildClient()
       ws?.send(JSON.stringify({ type: 'reload', path: '/pub/client.js' }))
     }
   })
+
+  // watch('app/islands/**/*.tsx').on('all', async (event, path) => {
+  //   if (event === 'change') {
+  //     const client = await Bun.file('app/client.ts').text()
+  //     const { imports, exports } = transpiler.scan(client)
+  //     const importPath = path.replace('app', '.')
+  //
+  //     if (!imports.some((imp) => imp.path === importPath)) {
+  //       // console.log('Adding import', importPath)
+  //       // await Bun.write('app/client.ts', client + `import '${importPath}'`)
+  //     }
+  //
+  //     await buildClient()
+  //     ws?.send(JSON.stringify({ type: 'reload', path: '/pub/client.js' }))
+  //   }
+  // })
 
   let wsID = 1
 
@@ -93,6 +88,16 @@ export function devServer(
       if (c.req.path === '/ws') {
         if (server.upgrade(req, { data: { id: wsID++ } })) return
         return c.text('Upgrade failed', 500)
+      }
+
+      if (c.req.path.startsWith('/pub')) {
+        const file = Bun.file(c.req.path.substring(1))
+        if (!(await file.exists())) return c.notFound()
+        return c.file(file)
+      }
+
+      if (c.req.path === '/pub/icon.png') {
+        return c.file('pub/icon.png')
       }
 
       if (c.req.path === '/pub/client.js') {
@@ -134,7 +139,7 @@ export function devServer(
       try {
         const res = await handler(c)
         if (res instanceof Response) return res
-        if (isVNode(res)) return c.render(res, { title })
+        if (isVNode(res)) return c.render(res, { title, path: c.req.path })
         throw new Error(`Invalid response at ${match.filePath}`)
       } catch (err: any) {
         return await import('../../app/routes/_error.tsx')

@@ -1,48 +1,43 @@
+import { islands } from 'lite/island'
 import './islands/counter'
+import './islands/chess-board'
+import { h, hydrate } from 'preact'
+import { onLoad } from 'lite/client/hacky-router'
+import type { FC } from 'preact/compat'
 
-// crate a helper to prefetch all the <a> tags with [data-prefetch] attribute
-
-document.addEventListener('DOMContentLoaded', () => {
-  const prefetchLinks = new Map<string, Promise<Response>>()
-
-  function prefetch(url: string) {
-    if (prefetchLinks.has(url)) return
-    prefetchLinks.set(url, fetch(url))
+declare global {
+  interface Window {
+    App: {
+      islands: Map<number, FC>
+      hydrate(): void
+      mount(): void
+    }
   }
+}
 
-  document.querySelectorAll('a[data-prefetch]').forEach(($a) => {
-    console.log($a)
+window.App = {
+  islands,
+  mount() {
+    onLoad()
+  },
+  hydrate() {
+    const start = performance.now()
+    for (const [id, Component] of islands) {
+      document
+        .querySelectorAll(`[data-island="${id}"]:not([data-hydrated])`)
+        .forEach(($island) => {
+          // console.log('Hydrating', id, $island)
+          $island.setAttribute('data-hydrated', '')
 
-    const url = $a.getAttribute('href')!
+          const $script = $island.querySelector('[type="application/json"]')
+          const props = JSON.parse($script?.textContent || '{}')
+          $script?.remove()
 
-    $a.addEventListener('click', (e) => {
-      e.preventDefault()
-      if (prefetchLinks.has(url)) {
-        prefetchLinks
-          .get(url)!
-          .then((res) => res.text().then((html) => apply(html, url)))
-      } else {
-        fetch(url).then((res) => res.text().then((html) => apply(html, url)))
-      }
-    })
+          hydrate(h(Component, props), $island)
+        })
+    }
+    console.log('Hydrate time:', (performance.now() - start).toFixed(3), 'ms')
+  },
+}
 
-    $a.addEventListener('mouseover', () => {
-      prefetch(url)
-    })
-  })
-
-  function apply(html: string, url: string) {
-    const doc = new DOMParser().parseFromString(html, 'text/html')
-    document.body.innerHTML = doc.body.innerHTML
-    // document.title = doc.title
-    document.head.innerHTML = doc.head.innerHTML
-    history.pushState({}, '', url)
-
-    /* doc.querySelectorAll('script').forEach(($script) => {
-      const script = document.createElement('script')
-      script.src = $script.src
-      script.textContent = $script.textContent
-      document.body.appendChild(script)
-    }) */
-  }
-})
+window.App.mount()

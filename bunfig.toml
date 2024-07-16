@@ -1,1 +1,5 @@
 preload = ["./lite/runtime/preload.ts"]
+
+
+[run]
+bun = true # equivalent to `bun --bun` for all `bun run` commands

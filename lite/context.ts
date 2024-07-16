@@ -6,9 +6,7 @@ import {
   type VNode,
 } from 'preact'
 import { renderToString } from 'preact-render-to-string'
-import { merge } from './util'
-import type { AnyObject } from './types'
-import type { Handler } from './trie/router'
+import { isVNode, merge } from './util'
 
 class LiteRequest extends Request {
   path: string
@@ -20,6 +18,13 @@ class LiteRequest extends Request {
     url ??= new URL(req.url)
     this.path = url.pathname
     this.query = url.searchParams
+  }
+
+  param(): Record<string, string | undefined>
+  param(key: string): string | undefined
+  param(key?: string): unknown {
+    if (!key) return this.params
+    return this.params[key]
   }
 }
 
@@ -38,7 +43,6 @@ export class Context {
   req: LiteRequest
   #status = 200
   #headers: Headers = {}
-  // #renderer?: FC<RendererProps>
   #layouts: FC<RendererProps>[] = []
   #res?: Response
   error?: Error
@@ -70,13 +74,13 @@ export class Context {
   }
 
   text(data: string, status?: number, headers?: Headers) {
-    this.header('content-type', 'text/plain')
+    this.header('content-type', 'text/plain;charset=utf8')
     return (this.res ??= new Response(data, this.#opts(status, headers)))
   }
 
   html(data: string | VNode, status?: number, headers?: Headers) {
-    this.header('content-type', 'text/html')
-    if (typeof data !== 'string') {
+    this.header('content-type', 'text/html;charset=utf8')
+    if (isVNode(data)) {
       return (this.res ??= new Response(
         renderToString(data),
         this.#opts(status, headers),
@@ -101,11 +105,13 @@ export class Context {
 
   file(file: string | BunFile, status?: number, headers?: Headers) {
     file = typeof file === 'string' ? Bun.file(file) : file
-    this.header('content-type', file.type)
+    // content-type automatically set by bun
+    // this.header('content-type', file.type)
     return (this.res ??= new Response(file, this.#opts(status, headers)))
   }
 
   notFound() {
+    this.status(404)
     return (this.res ??= new Response('404 Not Found', this.#opts()))
   }
 

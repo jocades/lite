@@ -10,4 +10,4 @@ trap cleanup EXIT
 bun build --outdir pub --watch app/client.ts &
 PID=$!
 
-bun --watch app/server.ts
+bun app/server.ts

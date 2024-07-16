@@ -1,4 +1,5 @@
 import { mdx } from 'lite/runtime/mdx-plugin'
+import { relative } from 'path'
 
 export async function buildClient() {
   const result = await Bun.build({
@@ -12,7 +13,12 @@ export async function buildClient() {
   }
 
   for (const output of result.outputs) {
-    console.log(output.path, '-', (output.size / 1024).toFixed(2), 'KB')
+    console.log(
+      relative(process.cwd(), output.path),
+      '-',
+      (output.size / 1024).toFixed(2),
+      'KB',
+    )
   }
 }
 

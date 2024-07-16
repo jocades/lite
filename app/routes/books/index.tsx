@@ -3,7 +3,7 @@ import { Router } from 'lite/trie/router'
 const app = new Router()
 
 app.get('/', (c) => {
-  return c.render(<h1>Hello!</h1>)
+  return c.render(<h1>Books Page</h1>)
   return c.json({
     incomingPath: c.req.path,
     request: c.req,

@@ -8,6 +8,7 @@ import { render } from 'preact-render-to-string'
 declare global {
   interface RenderProps {
     title: string
+    path: string
   }
 }
 

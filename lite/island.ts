@@ -6,18 +6,18 @@ import type { AnyObject } from './types'
 let componentId = 0
 
 // for dev
-const islands = new Map<number, FC<any>>()
+export const islands = new Map<number, FC<any>>()
 
 export function island<P extends AnyObject>(Component: FC<P>) {
   const id = componentId++
   islands.set(id, Component)
 
-  if (typeof window !== 'undefined') {
+  /* if (typeof window !== 'undefined') {
     document
-      .querySelectorAll(`[__island="${id}"]:not([hydrated])`)
+      .querySelectorAll(`[data-island="${id}"]:not([data-hydrated])`)
       .forEach(($island) => {
-        $island.setAttribute('hydrated', '')
-        $island.removeAttribute('__island')
+        console.log('Hydrating', id, Component.defaultProps)
+        $island.setAttribute('data-hydrated', '')
 
         const $script = $island.querySelector('[type="application/json"]')
         const props = JSON.parse($script?.textContent || '{}')
@@ -27,12 +27,12 @@ export function island<P extends AnyObject>(Component: FC<P>) {
       })
 
     return null as unknown as FC<P>
-  }
+  } */
 
   return (props: P) => {
     return h(
       'div',
-      { __island: id },
+      { 'data-island': id },
       h('script', {
         type: 'application/json',
         dangerouslySetInnerHTML: { __html: JSON.stringify(props) },
